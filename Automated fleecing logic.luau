@@ -11,43 +11,40 @@ if env.FleecingLogicSocket then
 end
 
 env.FleecingLogicStopRequested = false
-env.FleecingLogicRunning = true
+env.FleecingLogicRunning = false
 
-local websocketLibrary = WebSocket or websocket
+local websocketApi = WebSocket
 
-if not websocketLibrary then
-    env.FleecingLogicRunning = false
+if not websocketApi then
+    websocketApi = websocket
+end
+
+if not websocketApi then
     warn("WebSocket API was not found.")
     return
 end
 
-if type(websocketLibrary.connect) ~= "function" then
-    env.FleecingLogicRunning = false
-    warn("WebSocket connect function was not found.")
+if type(websocketApi.connect) ~= "function" then
+    warn("WebSocket.connect was not found.")
     return
 end
 
 local success, socket = pcall(function()
-    return websocketLibrary.connect("ws://127.0.0.1:8085/")
+    return websocketApi.connect("ws://127.0.0.1:8085/")
 end)
 
-if not success or not socket then
-    env.FleecingLogicRunning = false
-    warn("Failed to connect to ws://127.0.0.1:8085/")
+if not success then
+    warn("WebSocket connection error:", socket)
+    return
+end
+
+if not socket then
+    warn("WebSocket connection returned no socket.")
     return
 end
 
 env.FleecingLogicSocket = socket
-
-if env.FleecingLogicStopRequested then
-    pcall(function()
-        socket:Close()
-    end)
-
-    env.FleecingLogicSocket = nil
-    env.FleecingLogicRunning = false
-    return
-end
+env.FleecingLogicRunning = true
 
 local function stopLogic()
     env.FleecingLogicStopRequested = true
@@ -61,6 +58,8 @@ local function stopLogic()
         socket:Close()
     end)
 end
+
+env.FleecingLogicStop = stopLogic
 
 if socket.OnMessage then
     socket.OnMessage:Connect(function(message)
@@ -76,7 +75,12 @@ if socket.OnMessage then
             return HttpService:JSONDecode(message)
         end)
 
-        if not decodeSuccess or type(data) ~= "table" then
+        if not decodeSuccess then
+            warn("Failed to decode WebSocket message:", data)
+            return
+        end
+
+        if type(data) ~= "table" then
             return
         end
 
@@ -121,5 +125,3 @@ if bridge and bridge.Ready and type(bridge.Receive) == "function" then
         })
     end)
 end
-
-env.FleecingLogicStop = stopLogic
