@@ -5,7 +5,8 @@ local HttpService = game:GetService("HttpService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 local env = getgenv()
-
+env.FleecingLogicStopRequested = false
+env.FleecingLogicRunning = true
 local oldDiagnostic = playerGui:FindFirstChild("FleecingLogicDiagnostic")
 if oldDiagnostic then
     oldDiagnostic:Destroy()
