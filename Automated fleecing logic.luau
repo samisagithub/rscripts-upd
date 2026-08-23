@@ -13,33 +13,22 @@ end
 env.FleecingLogicStopRequested = false
 env.FleecingLogicRunning = false
 
-local websocketApi = WebSocket
-
-if not websocketApi then
-    websocketApi = websocket
-end
-
-if not websocketApi then
-    warn("WebSocket API was not found.")
+if not WebSocket then
+    warn("Volt WebSocket API was not found.")
     return
 end
 
-if type(websocketApi.connect) ~= "function" then
+if type(WebSocket.connect) ~= "function" then
     warn("WebSocket.connect was not found.")
     return
 end
 
 local success, socket = pcall(function()
-    return websocketApi.connect("ws://127.0.0.1:8085/")
+    return WebSocket.connect("ws://127.0.0.1:8085/")
 end)
 
-if not success then
-    warn("WebSocket connection error:", socket)
-    return
-end
-
-if not socket then
-    warn("WebSocket connection returned no socket.")
+if not success or not socket then
+    warn("WebSocket connection failed.")
     return
 end
 
@@ -59,8 +48,6 @@ local function stopLogic()
     end)
 end
 
-env.FleecingLogicStop = stopLogic
-
 if socket.OnMessage then
     socket.OnMessage:Connect(function(message)
         if env.FleecingLogicStopRequested then
@@ -75,12 +62,7 @@ if socket.OnMessage then
             return HttpService:JSONDecode(message)
         end)
 
-        if not decodeSuccess then
-            warn("Failed to decode WebSocket message:", data)
-            return
-        end
-
-        if type(data) ~= "table" then
+        if not decodeSuccess or type(data) ~= "table" then
             return
         end
 
@@ -125,3 +107,7 @@ if bridge and bridge.Ready and type(bridge.Receive) == "function" then
         })
     end)
 end
+
+env.FleecingLogicStop = stopLogic
+
+print("Fleecing Logic WebSocket connected.")
