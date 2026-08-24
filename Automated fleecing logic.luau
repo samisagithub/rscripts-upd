@@ -48,32 +48,34 @@ local function stopLogic()
     end)
 end
 
-if socket.OnMessage then
-    socket.OnMessage:Connect(function(message)
-        if env.FleecingLogicStopRequested then
-            return
-        end
+local function receiveData(message)
+    if env.FleecingLogicStopRequested then
+        return
+    end
 
-        if type(message) ~= "string" then
-            return
-        end
+    if type(message) ~= "string" then
+        return
+    end
 
-        local decodeSuccess, data = pcall(function()
-            return HttpService:JSONDecode(message)
-        end)
-
-        if not decodeSuccess or type(data) ~= "table" then
-            return
-        end
-
-        local bridge = env.FleecingGUIBridge
-
-        if bridge and bridge.Ready and type(bridge.Receive) == "function" then
-            pcall(function()
-                bridge.Receive(data)
-            end)
-        end
+    local decodeSuccess, data = pcall(function()
+        return HttpService:JSONDecode(message)
     end)
+
+    if not decodeSuccess or type(data) ~= "table" then
+        return
+    end
+
+    local bridge = env.FleecingGUIBridge
+
+    if bridge and bridge.Ready and type(bridge.Receive) == "function" then
+        pcall(function()
+            bridge.Receive(data)
+        end)
+    end
+end
+
+if socket.OnMessage then
+    socket.OnMessage:Connect(receiveData)
 end
 
 if socket.OnClose then
