@@ -24,7 +24,7 @@ if type(WebSocket.connect) ~= "function" then
 end
 
 local success, socket = pcall(function()
-    return WebSocket.connect("ws://127.0.0.1:8085/")
+    return WebSocket.connect("ws://78.154.103.12:15977/")
 end)
 
 if not success or not socket then
