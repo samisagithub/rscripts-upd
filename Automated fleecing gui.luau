@@ -31,6 +31,11 @@ end
 env.FleecingStopRequested = false
 env.FleecingLogicStopRequested = false
 
+-- Session lock (stops spam race)
+env.FleecingGUISession = (env.FleecingGUISession or 0) + 1
+local myGuiSession = env.FleecingGUISession
+local acceptingData = false
+
 -------------------------------------------------
 -- CONFIG / JSON PERSISTENCE
 -------------------------------------------------
@@ -1340,7 +1345,6 @@ local function createUserEntry(username)
     brainrotCorner.CornerRadius = UDim.new(0, 6)
     brainrotCorner.Parent = brainrotImage
 
-    -- Brainrot text: middle of the lower row, clear of the image
     local brainrotLabel = Instance.new("TextLabel")
     brainrotLabel.Name = "Brainrot"
     brainrotLabel.Size = UDim2.new(1, -200, 0, 30)
@@ -1569,9 +1573,13 @@ end
 local function destroyGUI()
     if destroyed then return end
     destroyed = true
+    acceptingData = false
     dragging = false
     loopTradesEnabled = false
     fleecingEnabled = false
+
+    -- bump session so any late packets are ignored
+    env.FleecingGUISession = (env.FleecingGUISession or 0) + 1
 
     -- Same as CLEAR: wipe users + logs before destroying
     pcall(function()
@@ -1809,9 +1817,12 @@ end)
 -------------------------------------------------
 env.FleecingGUIBridge = {
     Ready = true,
+    Session = myGuiSession,
 
     Receive = function(data)
         if destroyed then return end
+        if not acceptingData then return end
+        if env.FleecingGUISession ~= myGuiSession then return end
         if type(data) ~= "table" then return end
 
         if data.type == "connection" then
@@ -1834,6 +1845,8 @@ env.FleecingGUIBridge = {
         if data.type == "user_online" then
             if type(data.username) ~= "string" or data.username == "" then return end
 
+            local alreadyHad = mainContent:FindFirstChild("User_" .. data.username) ~= nil
+
             mainEmpty.Visible = false
             local entry = createUserEntry(data.username)
             updateUserPositions()
@@ -1845,8 +1858,10 @@ env.FleecingGUIBridge = {
                 end
             end
 
-            createLog("Online: " .. data.username)
-            updateLogPositions()
+            if not alreadyHad then
+                createLog("Online: " .. data.username)
+                updateLogPositions()
+            end
             return
         end
 
@@ -1903,6 +1918,17 @@ updateToggle()
 updateLoopTrades()
 updateSection()
 updateSettingsButtonVisibility()
+
+-- Make sure any previous logic is fully dead before connecting again
+env.FleecingLogicStopRequested = true
+if type(env.FleecingLogicStop) == "function" then
+    pcall(env.FleecingLogicStop)
+end
+task.wait(0.4)
+env.FleecingLogicStopRequested = false
+
+-- Now accept data for this session only
+acceptingData = true
 
 if not env.FleecingLogicRunning then
     task.spawn(function()
