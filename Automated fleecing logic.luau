@@ -2,7 +2,7 @@ local HttpService = game:GetService("HttpService")
 
 local env = getgenv()
 
--- Hard stop any previous logic instance before starting a new one
+-- Hard stop any previous logic instance
 if type(env.FleecingLogicStop) == "function" then
     pcall(env.FleecingLogicStop)
 end
@@ -17,8 +17,7 @@ end
 env.FleecingLogicStopRequested = true
 env.FleecingLogicRunning = false
 
--- Small wait so the old socket fully closes (stops spam race)
-task.wait(0.35)
+task.wait(0.45)
 
 env.FleecingLogicStopRequested = false
 
@@ -32,7 +31,6 @@ if type(WebSocket.connect) ~= "function" then
     return
 end
 
--- Unique session id so old sockets can't feed a new GUI
 env.FleecingLogicSession = (env.FleecingLogicSession or 0) + 1
 local mySession = env.FleecingLogicSession
 
@@ -45,7 +43,6 @@ if not success or not socket then
     return
 end
 
--- If another run already started after us, abort
 if env.FleecingLogicSession ~= mySession then
     pcall(function()
         socket:Close()
@@ -70,7 +67,6 @@ local function stopLogic()
 end
 
 local function receiveData(message)
-    -- Drop everything if this session is dead or stop was requested
     if env.FleecingLogicStopRequested then
         return
     end
@@ -93,7 +89,6 @@ local function receiveData(message)
     local bridge = env.FleecingGUIBridge
 
     if bridge and bridge.Ready and type(bridge.Receive) == "function" then
-        -- Only deliver if the GUI session still matches
         if bridge.Session == nil or bridge.Session == env.FleecingGUISession then
             pcall(function()
                 bridge.Receive(data)
