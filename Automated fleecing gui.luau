@@ -668,7 +668,7 @@ helpContentCorner.Parent = helpContent
 
 local helpText = Instance.new("TextLabel")
 helpText.Name = "HelpText"
-helpText.Size = UDim2.new(1, -20, 0, 210)
+helpText.Size = UDim2.new(1, -20, 0, 320)
 helpText.Position = UDim2.new(0, 10, 0, 10)
 helpText.BackgroundTransparency = 1
 helpText.Text = "Welcome to the Fleecing Tool.\n\nSTART FLEECING\nEnables or disables the main system.\n\nLOOP TRADES\nWhen both Fleecing + Loop Trades are on: trades newest user first, then continuously cycles oldest → newest. State is saved.\n\nMARK FLEECE BUTTON\nMarks a user so they are skipped by auto-trade and loop. Marked users are grayed out and TRADE is hidden. Saved permanently until unmarked.\n\nSETTINGS (⚙)\nAppears when you have marked users. Lets you unmark them.\n\nCLEAR DATA\nRemoves currently displayed users (does not unmark them).\n\nMAIN / LOGS\nSwitch between tracked users and event logs."
@@ -681,7 +681,7 @@ helpText.TextWrapped = true
 helpText.ZIndex = 54
 helpText.Parent = helpContent
 
-helpContent.CanvasSize = UDim2.new(0, 0, 0, 230)
+helpContent.CanvasSize = UDim2.new(0, 0, 0, 340)
 
 -------------------------------------------------
 -- SETTINGS FRAME
@@ -1330,6 +1330,21 @@ local function createUserEntry(username)
     usernameLabel.TextTruncate = Enum.TextTruncate.AtEnd
     usernameLabel.ZIndex = 8
     usernameLabel.Parent = entry
+
+
+    local inGameHint = Instance.new("TextLabel")
+    inGameHint.Name = "InGameHint"
+    inGameHint.Size = UDim2.new(0, 120, 0, 18)
+    inGameHint.Position = UDim2.new(0, 195, 0.5, -9)
+    inGameHint.BackgroundTransparency = 1
+    inGameHint.Text = "User may not be ingame"
+    inGameHint.TextColor3 = Color3.fromRGB(155, 165, 160)
+    inGameHint.TextSize = 8
+    inGameHint.Font = Enum.Font.Gotham
+    inGameHint.TextXAlignment = Enum.TextXAlignment.Center
+    inGameHint.TextYAlignment = Enum.TextYAlignment.Center
+    inGameHint.ZIndex = 8
+    inGameHint.Parent = entry
 
     local brainrotImage = Instance.new("ImageLabel")
     brainrotImage.Name = "BrainrotImage"
