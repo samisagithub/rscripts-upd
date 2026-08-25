@@ -8,7 +8,6 @@ local env = getgenv()
 
 local oldGui = playerGui:FindFirstChild("FleecingGUI")
 
--- Full cleanup when re-running (same as CLEAR)
 if type(env.FleecingClearData) == "function" then
     pcall(env.FleecingClearData)
 end
@@ -31,14 +30,11 @@ end
 env.FleecingStopRequested = false
 env.FleecingLogicStopRequested = false
 
--- Session lock (stops spam race)
 env.FleecingGUISession = (env.FleecingGUISession or 0) + 1
 local myGuiSession = env.FleecingGUISession
 local acceptingData = false
+local ignoreBulkSync = false
 
--------------------------------------------------
--- CONFIG / JSON PERSISTENCE
--------------------------------------------------
 local CONFIG_FILE = "FleecingConfig.json"
 local markedUsers = {}
 local fleecingEnabled = false
@@ -60,9 +56,11 @@ local function saveConfig()
         loopTrades = loopTradesEnabled,
         markedUsers = markedUsers
     }
+
     local success, encoded = pcall(function()
         return HttpService:JSONEncode(data)
     end)
+
     if success and type(writefile) == "function" then
         pcall(function()
             writefile(CONFIG_FILE, encoded)
@@ -74,25 +72,37 @@ local function loadConfig()
     if type(isfile) ~= "function" or type(readfile) ~= "function" then
         return
     end
+
     local exists = false
+
     pcall(function()
         exists = isfile(CONFIG_FILE)
     end)
-    if not exists then return end
+
+    if not exists then
+        return
+    end
 
     local success, content = pcall(function()
         return readfile(CONFIG_FILE)
     end)
-    if not success or type(content) ~= "string" or content == "" then return end
+
+    if not success or type(content) ~= "string" or content == "" then
+        return
+    end
 
     local ok, data = pcall(function()
         return HttpService:JSONDecode(content)
     end)
-    if not ok or type(data) ~= "table" then return end
+
+    if not ok or type(data) ~= "table" then
+        return
+    end
 
     if type(data.loopTrades) == "boolean" then
         loopTradesEnabled = data.loopTrades
     end
+
     if type(data.markedUsers) == "table" then
         markedUsers = data.markedUsers
     end
@@ -100,9 +110,6 @@ end
 
 loadConfig()
 
--------------------------------------------------
--- GUI CREATION
--------------------------------------------------
 local gui = Instance.new("ScreenGui")
 gui.Name = "FleecingGUI"
 gui.ResetOnSpawn = false
@@ -535,9 +542,6 @@ logsEmpty.TextXAlignment = Enum.TextXAlignment.Center
 logsEmpty.ZIndex = 6
 logsEmpty.Parent = logsContent
 
--------------------------------------------------
--- HELP FRAME
--------------------------------------------------
 local helpShadow = Instance.new("Frame")
 helpShadow.Name = "HelpShadow"
 helpShadow.Size = UDim2.new(0, 416, 0, 316)
@@ -683,9 +687,6 @@ helpText.Parent = helpContent
 
 helpContent.CanvasSize = UDim2.new(0, 0, 0, 340)
 
--------------------------------------------------
--- SETTINGS FRAME
--------------------------------------------------
 local settingsShadow = Instance.new("Frame")
 settingsShadow.Name = "SettingsShadow"
 settingsShadow.Size = UDim2.new(0, 416, 0, 316)
@@ -827,9 +828,6 @@ settingsEmpty.TextXAlignment = Enum.TextXAlignment.Center
 settingsEmpty.ZIndex = 54
 settingsEmpty.Parent = settingsContent
 
--------------------------------------------------
--- HELPER FUNCTIONS
--------------------------------------------------
 local function updateToggle()
     if fleecingEnabled then
         toggle.Text = "STOP FLEECING"
@@ -853,6 +851,7 @@ end
 local function updateLoopTrades()
     if loopTradesEnabled then
         loopTrades.Text = "LOOP TRADES: ON"
+
         if fleecingEnabled then
             loopTrades.BackgroundColor3 = Color3.fromRGB(67, 105, 82)
             loopTrades.TextColor3 = Color3.fromRGB(231, 242, 235)
@@ -886,9 +885,12 @@ local function updateSection()
 end
 
 local function updateUserPositions()
-    if destroyed or not mainContent.Parent then return end
+    if destroyed or not mainContent.Parent then
+        return
+    end
 
     local entries = {}
+
     for _, child in ipairs(mainContent:GetChildren()) do
         if child:IsA("Frame") and child.Name:sub(1, 5) == "User_" then
             table.insert(entries, child)
@@ -899,7 +901,7 @@ local function updateUserPositions()
         return a.LayoutOrder < b.LayoutOrder
     end)
 
-     local entryHeight = 78
+    local entryHeight = 78
     local topPadding = 6
 
     for index, entry in ipairs(entries) do
@@ -910,16 +912,26 @@ local function updateUserPositions()
     mainContent.CanvasSize = UDim2.new(0, 0, 0, math.max(totalHeight, mainContent.AbsoluteSize.Y))
 
     task.defer(function()
-        if destroyed or not mainContent.Parent then return end
-        local maximumCanvasPosition = math.max(0, mainContent.AbsoluteCanvasSize.Y - mainContent.AbsoluteSize.Y)
+        if destroyed or not mainContent.Parent then
+            return
+        end
+
+        local maximumCanvasPosition = math.max(
+            0,
+            mainContent.AbsoluteCanvasSize.Y - mainContent.AbsoluteSize.Y
+        )
+
         mainContent.CanvasPosition = Vector2.new(0, maximumCanvasPosition)
     end)
 end
 
 local function updateLogPositions()
-    if destroyed or not logsContent.Parent then return end
+    if destroyed or not logsContent.Parent then
+        return
+    end
 
     local logs = {}
+
     for _, child in ipairs(logsContent:GetChildren()) do
         if child:IsA("TextLabel") and child ~= logsEmpty then
             table.insert(logs, child)
@@ -935,11 +947,18 @@ local function updateLogPositions()
     end
 
     local totalHeight = (#logs * 18) + 5
-    logsContent.CanvasSize = UDim2.new(0, 0, 0, math.max(totalHeight, logsContent.AbsoluteSize.Y))
+    logsContent.CanvasSize = UDim2.new(
+        0,
+        0,
+        0,
+        math.max(totalHeight, logsContent.AbsoluteSize.Y)
+    )
 end
 
 local function createLog(text)
-    if destroyed or type(text) ~= "string" then return end
+    if destroyed or type(text) ~= "string" then
+        return
+    end
 
     local log = Instance.new("TextLabel")
     log.Name = "Log_" .. tostring(os.clock())
@@ -960,9 +979,12 @@ local function createLog(text)
 end
 
 local function clearCurrentData()
-    if destroyed then return end
+    if destroyed then
+        return
+    end
 
     local users = {}
+
     for _, child in ipairs(mainContent:GetChildren()) do
         if child:IsA("Frame") and child.Name:sub(1, 5) == "User_" then
             table.insert(users, child)
@@ -974,6 +996,7 @@ local function clearCurrentData()
     end
 
     local logs = {}
+
     for _, child in ipairs(logsContent:GetChildren()) do
         if child:IsA("TextLabel") and child ~= logsEmpty then
             table.insert(logs, child)
@@ -997,8 +1020,13 @@ local function clearCurrentData()
 end
 
 local function loadImage(imageObject, imageUrl)
-    if destroyed or not imageObject or not imageObject.Parent then return end
-    if type(imageUrl) ~= "string" or imageUrl == "" then return end
+    if destroyed or not imageObject or not imageObject.Parent then
+        return
+    end
+
+    if type(imageUrl) ~= "string" or imageUrl == "" then
+        return
+    end
 
     if imageUrl:match("^rbxassetid://") or imageUrl:match("^rbxthumb://") then
         imageObject.Image = imageUrl
@@ -1007,6 +1035,7 @@ local function loadImage(imageObject, imageUrl)
 
     task.spawn(function()
         imageCounter += 1
+
         local id = imageCounter
         local extension = ".png"
         local lowerUrl = imageUrl:lower()
@@ -1023,26 +1052,46 @@ local function loadImage(imageObject, imageUrl)
             return game:HttpGet(imageUrl)
         end)
 
-        if destroyed or not imageObject.Parent then return end
-        if not requestSuccess or type(body) ~= "string" or body == "" then return end
-        if type(writefile) ~= "function" then return end
+        if destroyed or not imageObject.Parent then
+            return
+        end
+
+        if not requestSuccess or type(body) ~= "string" or body == "" then
+            return
+        end
+
+        if type(writefile) ~= "function" then
+            return
+        end
 
         local writeSuccess = pcall(function()
             writefile(fileName, body)
         end)
-        if not writeSuccess then return end
-        if destroyed or not imageObject.Parent then return end
 
-        local assetFunction = (type(getcustomasset) == "function" and getcustomasset)
+        if not writeSuccess then
+            return
+        end
+
+        if destroyed or not imageObject.Parent then
+            return
+        end
+
+        local assetFunction =
+            (type(getcustomasset) == "function" and getcustomasset)
             or (type(getsynasset) == "function" and getsynasset)
 
-        if not assetFunction then return end
+        if not assetFunction then
+            return
+        end
 
         local assetSuccess, asset = pcall(function()
             return assetFunction(fileName)
         end)
 
-        if destroyed or not imageObject.Parent then return end
+        if destroyed or not imageObject.Parent then
+            return
+        end
+
         if assetSuccess and type(asset) == "string" and asset ~= "" then
             imageObject.Image = asset
         end
@@ -1063,7 +1112,9 @@ local function SendInvite(targetUsername)
         :WaitForChild("Sections")
         :WaitForChild("Players")
 
-    local SearchBox = PlayersSection:WaitForChild("SearchFrame"):WaitForChild("SearchBox")
+    local SearchBox = PlayersSection
+        :WaitForChild("SearchFrame")
+        :WaitForChild("SearchBox")
 
     SearchBox:CaptureFocus()
     SearchBox.Text = targetUsername
@@ -1074,6 +1125,7 @@ local function SendInvite(targetUsername)
     local targetButton = nil
 
     local timeout = 0
+
     while not targetButton and timeout < 50 do
         for _, child in ipairs(List:GetChildren()) do
             if child.Name:lower():match("^" .. targetUsername:lower() .. "_") then
@@ -1081,6 +1133,7 @@ local function SendInvite(targetUsername)
                 break
             end
         end
+
         if not targetButton then
             task.wait(0.2)
             timeout += 1
@@ -1096,9 +1149,19 @@ local function SendInvite(targetUsername)
 
     local fired = false
 
-    for _, signal in pairs({"Activated", "MouseButton1Click", "MouseButton1Down"}) do
-        if fired then break end
-        local success, connections = pcall(function() return getconnections(sendButton[signal]) end)
+    for _, signal in pairs({
+        "Activated",
+        "MouseButton1Click",
+        "MouseButton1Down"
+    }) do
+        if fired then
+            break
+        end
+
+        local success, connections = pcall(function()
+            return getconnections(sendButton[signal])
+        end)
+
         if success and #connections > 0 then
             connections[1]:Fire()
             fired = true
@@ -1106,10 +1169,20 @@ local function SendInvite(targetUsername)
     end
 
     if not fired then
-        for _, signal in pairs({"Activated", "MouseButton1Click"}) do
-            if fired then break end
+        for _, signal in pairs({
+            "Activated",
+            "MouseButton1Click"
+        }) do
+            if fired then
+                break
+            end
+
             local fill = sendButton.Parent
-            local success, connections = pcall(function() return getconnections(fill[signal]) end)
+
+            local success, connections = pcall(function()
+                return getconnections(fill[signal])
+            end)
+
             if success and #connections > 0 then
                 connections[1]:Fire()
                 fired = true
@@ -1125,28 +1198,34 @@ local function isMarked(username)
 end
 
 local function applyMarkedStyle(entry, marked)
-    if not entry or not entry.Parent then return end
+    if not entry or not entry.Parent then
+        return
+    end
 
     local tradeButton = entry:FindFirstChild("TradeButton")
     local mfButton = entry:FindFirstChild("MFButton")
 
     if marked then
         entry.BackgroundColor3 = Color3.fromRGB(32, 36, 34)
+
         if tradeButton then
             tradeButton.Visible = false
         end
+
         if mfButton then
             mfButton.Text = "Unmark"
             mfButton.BackgroundColor3 = Color3.fromRGB(90, 55, 55)
         end
     else
         entry.BackgroundColor3 = Color3.fromRGB(43, 50, 46)
+
         if tradeButton then
             tradeButton.Visible = true
             tradeButton.Text = "TRADE"
             tradeButton.BackgroundColor3 = Color3.fromRGB(67, 105, 82)
             tradeButton.Active = true
         end
+
         if mfButton then
             mfButton.Text = "Mark fleece"
             mfButton.BackgroundColor3 = Color3.fromRGB(70, 80, 75)
@@ -1156,9 +1235,11 @@ end
 
 local function updateSettingsButtonVisibility()
     local count = 0
+
     for _ in pairs(markedUsers) do
         count += 1
     end
+
     settingsBtn.Visible = count > 0
 end
 
@@ -1170,14 +1251,21 @@ local function refreshSettingsList()
     end
 
     local list = {}
+
     for name, _ in pairs(markedUsers) do
         table.insert(list, name)
     end
+
     table.sort(list)
 
     if #list == 0 then
         settingsEmpty.Visible = true
-        settingsContent.CanvasSize = UDim2.new(0, 0, 0, settingsContent.AbsoluteSize.Y)
+        settingsContent.CanvasSize = UDim2.new(
+            0,
+            0,
+            0,
+            settingsContent.AbsoluteSize.Y
+        )
         return
     end
 
@@ -1228,12 +1316,16 @@ local function refreshSettingsList()
         unmarkCorner.Parent = unmarkBtn
 
         unmarkBtn.MouseButton1Click:Connect(function()
-            if destroyed then return end
+            if destroyed then
+                return
+            end
+
             markedUsers[username] = nil
             saveConfig()
             updateSettingsButtonVisibility()
 
             local liveEntry = mainContent:FindFirstChild("User_" .. username)
+
             if liveEntry then
                 applyMarkedStyle(liveEntry, false)
             end
@@ -1244,13 +1336,26 @@ local function refreshSettingsList()
         end)
     end
 
-    settingsContent.CanvasSize = UDim2.new(0, 0, 0, 8 + #list * 42 + 8)
+    settingsContent.CanvasSize = UDim2.new(
+        0,
+        0,
+        0,
+        8 + #list * 42 + 8
+    )
 end
 
 local function performTrade(username, tradeButton)
-    if isTrading or destroyed then return end
-    if isMarked(username) then return end
-    if not tradeButton or not tradeButton.Parent then return end
+    if isTrading or destroyed then
+        return
+    end
+
+    if isMarked(username) then
+        return
+    end
+
+    if not tradeButton or not tradeButton.Parent then
+        return
+    end
 
     isTrading = true
     tradeButton.Active = false
@@ -1271,7 +1376,10 @@ local function performTrade(username, tradeButton)
 
             task.wait(2)
 
-            if not destroyed and tradeButton.Parent and not isMarked(username) then
+            if not destroyed
+                and tradeButton.Parent
+                and not isMarked(username) then
+
                 tradeButton.Active = true
                 tradeButton.Text = "TRADE"
                 tradeButton.BackgroundColor3 = Color3.fromRGB(67, 105, 82)
@@ -1283,12 +1391,17 @@ local function performTrade(username, tradeButton)
 end
 
 local function createUserEntry(username)
-    if destroyed or type(username) ~= "string" or username == "" then return end
+    if destroyed or type(username) ~= "string" or username == "" then
+        return
+    end
 
     local existing = mainContent:FindFirstChild("User_" .. username)
-    if existing then return existing end
 
-       local entry = Instance.new("Frame")
+    if existing then
+        return existing
+    end
+
+    local entry = Instance.new("Frame")
     entry.Name = "User_" .. username
     entry.Size = UDim2.new(1, -18, 0, 72)
     entry.Position = UDim2.new(0, 8, 0, 0)
@@ -1302,7 +1415,6 @@ local function createUserEntry(username)
     entryCorner.CornerRadius = UDim.new(0, 7)
     entryCorner.Parent = entry
 
-    -- Profile
     local profileImage = Instance.new("ImageLabel")
     profileImage.Name = "ProfilePicture"
     profileImage.Size = UDim2.new(0, 42, 0, 42)
@@ -1317,7 +1429,6 @@ local function createUserEntry(username)
     imageCorner.CornerRadius = UDim.new(1, 0)
     imageCorner.Parent = profileImage
 
-    -- Username (top)
     local usernameLabel = Instance.new("TextLabel")
     usernameLabel.Name = "Username"
     usernameLabel.Size = UDim2.new(1, -220, 0, 18)
@@ -1333,7 +1444,6 @@ local function createUserEntry(username)
     usernameLabel.ZIndex = 8
     usernameLabel.Parent = entry
 
-    -- Brainrot image
     local brainrotImage = Instance.new("ImageLabel")
     brainrotImage.Name = "BrainrotImage"
     brainrotImage.Size = UDim2.new(0, 26, 0, 26)
@@ -1348,7 +1458,6 @@ local function createUserEntry(username)
     brainrotCorner.CornerRadius = UDim.new(0, 5)
     brainrotCorner.Parent = brainrotImage
 
-    -- Brainrot text
     local brainrotLabel = Instance.new("TextLabel")
     brainrotLabel.Name = "Brainrot"
     brainrotLabel.Size = UDim2.new(1, -220, 0, 26)
@@ -1364,7 +1473,6 @@ local function createUserEntry(username)
     brainrotLabel.ZIndex = 8
     brainrotLabel.Parent = entry
 
-    -- Hint under brainrot row (fits cleanly)
     local inGameHint = Instance.new("TextLabel")
     inGameHint.Name = "InGameHint"
     inGameHint.Size = UDim2.new(1, -220, 0, 14)
@@ -1379,7 +1487,6 @@ local function createUserEntry(username)
     inGameHint.ZIndex = 8
     inGameHint.Parent = entry
 
-    -- TRADE button
     local tradeButton = Instance.new("TextButton")
     tradeButton.Name = "TradeButton"
     tradeButton.Size = UDim2.new(0, 52, 0, 24)
@@ -1400,7 +1507,6 @@ local function createUserEntry(username)
     tradeCorner.CornerRadius = UDim.new(0, 6)
     tradeCorner.Parent = tradeButton
 
-    -- Mark fleece button
     local mfButton = Instance.new("TextButton")
     mfButton.Name = "MFButton"
     mfButton.Size = UDim2.new(0, 85, 0, 24)
@@ -1422,24 +1528,35 @@ local function createUserEntry(username)
     mfCorner.Parent = mfButton
 
     tradeButton.MouseEnter:Connect(function()
-        if not destroyed and tradeButton.Text == "TRADE" and tradeButton.Visible then
+        if not destroyed
+            and tradeButton.Text == "TRADE"
+            and tradeButton.Visible then
+
             tradeButton.BackgroundColor3 = Color3.fromRGB(82, 126, 98)
         end
     end)
 
     tradeButton.MouseLeave:Connect(function()
-        if not destroyed and tradeButton.Text == "TRADE" and tradeButton.Visible then
+        if not destroyed
+            and tradeButton.Text == "TRADE"
+            and tradeButton.Visible then
+
             tradeButton.BackgroundColor3 = Color3.fromRGB(67, 105, 82)
         end
     end)
 
     tradeButton.MouseButton1Click:Connect(function()
-        if destroyed then return end
+        if destroyed then
+            return
+        end
+
         performTrade(username, tradeButton)
     end)
 
     mfButton.MouseButton1Click:Connect(function()
-        if destroyed then return end
+        if destroyed then
+            return
+        end
 
         if isMarked(username) then
             markedUsers[username] = nil
@@ -1465,8 +1582,13 @@ local function createUserEntry(username)
             return Players:GetUserIdFromNameAsync(username)
         end)
 
-        if destroyed or not entry.Parent then return end
-        if not userIdSuccess or type(userId) ~= "number" then return end
+        if destroyed or not entry.Parent then
+            return
+        end
+
+        if not userIdSuccess or type(userId) ~= "number" then
+            return
+        end
 
         local thumbnailSuccess, contentUrl = pcall(function()
             return Players:GetUserThumbnailAsync(
@@ -1476,7 +1598,10 @@ local function createUserEntry(username)
             )
         end)
 
-        if destroyed or not entry.Parent then return end
+        if destroyed or not entry.Parent then
+            return
+        end
+
         if thumbnailSuccess and type(contentUrl) == "string" then
             profileImage.Image = contentUrl
         end
@@ -1486,12 +1611,23 @@ local function createUserEntry(username)
 end
 
 local function setBrainrot(username, brainrot, imageUrl, ogType)
-    if destroyed then return end
-    if type(username) ~= "string" or username == "" then return end
-    if type(brainrot) ~= "string" or brainrot == "" then return end
+    if destroyed then
+        return
+    end
+
+    if type(username) ~= "string" or username == "" then
+        return
+    end
+
+    if type(brainrot) ~= "string" or brainrot == "" then
+        return
+    end
 
     local entry = createUserEntry(username)
-    if not entry then return end
+
+    if not entry then
+        return
+    end
 
     local brainrotImage = entry:FindFirstChild("BrainrotImage")
     local brainrotLabel = entry:FindFirstChild("Brainrot")
@@ -1508,6 +1644,7 @@ local function setBrainrot(username, brainrot, imageUrl, ogType)
         else
             brainrotLabel.Text = brainrot
         end
+
         brainrotLabel.TextColor3 = Color3.fromRGB(214, 225, 218)
     end
 
@@ -1516,11 +1653,19 @@ local function setBrainrot(username, brainrot, imageUrl, ogType)
 end
 
 local function removeBrainrot(username)
-    if destroyed then return end
-    if type(username) ~= "string" or username == "" then return end
+    if destroyed then
+        return
+    end
+
+    if type(username) ~= "string" or username == "" then
+        return
+    end
 
     local entry = mainContent:FindFirstChild("User_" .. username)
-    if not entry then return end
+
+    if not entry then
+        return
+    end
 
     local brainrotImage = entry:FindFirstChild("BrainrotImage")
     local brainrotLabel = entry:FindFirstChild("Brainrot")
@@ -1566,9 +1711,13 @@ local function setMinimized(state)
 end
 
 local function isInside(guiObject, position)
-    if not guiObject or not guiObject.Parent or not guiObject.Visible then return false end
+    if not guiObject or not guiObject.Parent or not guiObject.Visible then
+        return false
+    end
+
     local absolutePosition = guiObject.AbsolutePosition
     local absoluteSize = guiObject.AbsoluteSize
+
     return position.X >= absolutePosition.X
         and position.X <= absolutePosition.X + absoluteSize.X
         and position.Y >= absolutePosition.Y
@@ -1576,9 +1725,16 @@ local function isInside(guiObject, position)
 end
 
 local function beginDrag(input)
-    if destroyed then return end
+    if destroyed then
+        return
+    end
+
     if input.UserInputType ~= Enum.UserInputType.MouseButton1
-        and input.UserInputType ~= Enum.UserInputType.Touch then return end
+        and input.UserInputType ~= Enum.UserInputType.Touch then
+
+        return
+    end
+
     dragging = true
     dragStart = input.Position
     startPosition = frame.Position
@@ -1587,28 +1743,32 @@ end
 local function endDrag(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1
         or input.UserInputType == Enum.UserInputType.Touch then
+
         dragging = false
     end
 end
 
 local function destroyGUI()
-    if destroyed then return end
+    if destroyed then
+        return
+    end
+
     destroyed = true
     acceptingData = false
+    ignoreBulkSync = true
     dragging = false
     loopTradesEnabled = false
     fleecingEnabled = false
 
-    -- bump session so any late packets are ignored
     env.FleecingGUISession = (env.FleecingGUISession or 0) + 1
 
-    -- Same as CLEAR: wipe users + logs before destroying
     pcall(function()
         for _, child in ipairs(mainContent:GetChildren()) do
             if child:IsA("Frame") and child.Name:sub(1, 5) == "User_" then
                 child:Destroy()
             end
         end
+
         for _, child in ipairs(logsContent:GetChildren()) do
             if child:IsA("TextLabel") and child ~= logsEmpty then
                 child:Destroy()
@@ -1633,15 +1793,20 @@ local function destroyGUI()
 end
 
 local function startLoopTrades()
-    if loopRunning then return end
+    if loopRunning then
+        return
+    end
+
     loopRunning = true
 
     task.spawn(function()
         while loopTradesEnabled and fleecingEnabled and not destroyed do
             local entries = {}
+
             for _, child in ipairs(mainContent:GetChildren()) do
                 if child:IsA("Frame") and child.Name:sub(1, 5) == "User_" then
                     local uname = child.Name:sub(6)
+
                     if not isMarked(uname) then
                         table.insert(entries, child)
                     end
@@ -1653,17 +1818,25 @@ local function startLoopTrades()
             end)
 
             for _, entry in ipairs(entries) do
-                if not (loopTradesEnabled and fleecingEnabled) or destroyed then break end
+                if not (loopTradesEnabled and fleecingEnabled) or destroyed then
+                    break
+                end
 
                 local username = entry.Name:sub(6)
-                if isMarked(username) then continue end
+
+                if isMarked(username) then
+                    continue
+                end
 
                 local tradeButton = entry:FindFirstChild("TradeButton")
+
                 if tradeButton and tradeButton.Visible then
                     performTrade(username, tradeButton)
+
                     while isTrading and not destroyed do
                         task.wait(0.1)
                     end
+
                     task.wait(0.8)
                 end
             end
@@ -1675,23 +1848,31 @@ local function startLoopTrades()
     end)
 end
 
--------------------------------------------------
--- INPUT / BUTTONS
--------------------------------------------------
 topBar.InputBegan:Connect(function(input)
-    if destroyed then return end
+    if destroyed then
+        return
+    end
+
     if isInside(exit, input.Position)
         or isInside(minimize, input.Position)
         or isInside(settingsBtn, input.Position) then
+
         return
     end
+
     beginDrag(input)
 end)
 
 frame.InputBegan:Connect(function(input)
-    if destroyed then return end
+    if destroyed then
+        return
+    end
+
     if input.UserInputType ~= Enum.UserInputType.MouseButton1
-        and input.UserInputType ~= Enum.UserInputType.Touch then return end
+        and input.UserInputType ~= Enum.UserInputType.Touch then
+
+        return
+    end
 
     if isInside(exit, input.Position)
         or isInside(minimize, input.Position)
@@ -1703,26 +1884,36 @@ frame.InputBegan:Connect(function(input)
         or isInside(clearButton, input.Position)
         or isInside(helpButton, input.Position)
         or isInside(content, input.Position) then
+
         return
     end
+
     beginDrag(input)
 end)
 
 UserInputService.InputEnded:Connect(endDrag)
 
 UserInputService.InputChanged:Connect(function(input)
-    if destroyed then return end
+    if destroyed then
+        return
+    end
+
     if dragging then
         if input.UserInputType ~= Enum.UserInputType.MouseMovement
-            and input.UserInputType ~= Enum.UserInputType.Touch then return end
+            and input.UserInputType ~= Enum.UserInputType.Touch then
+
+            return
+        end
 
         local delta = input.Position - dragStart
+
         frame.Position = UDim2.new(
             startPosition.X.Scale,
             startPosition.X.Offset + delta.X,
             startPosition.Y.Scale,
             startPosition.Y.Offset + delta.Y
         )
+
         shadow.Position = UDim2.new(
             frame.Position.X.Scale,
             frame.Position.X.Offset - 8,
@@ -1737,9 +1928,12 @@ exit.MouseButton1Click:Connect(function()
 end)
 
 toggle.MouseButton1Click:Connect(function()
-    if destroyed then return end
+    if destroyed then
+        return
+    end
 
     fleecingEnabled = not fleecingEnabled
+
     updateToggle()
     updateLoopTrades()
 
@@ -1749,10 +1943,16 @@ toggle.MouseButton1Click:Connect(function()
 end)
 
 loopTrades.MouseButton1Click:Connect(function()
-    if destroyed then return end
-    if not fleecingEnabled then return end
+    if destroyed then
+        return
+    end
+
+    if not fleecingEnabled then
+        return
+    end
 
     loopTradesEnabled = not loopTradesEnabled
+
     updateLoopTrades()
     saveConfig()
 
@@ -1762,23 +1962,33 @@ loopTrades.MouseButton1Click:Connect(function()
     else
         createLog("Trade loop disabled")
     end
+
     updateLogPositions()
 end)
 
 mainButton.MouseButton1Click:Connect(function()
-    if destroyed then return end
+    if destroyed then
+        return
+    end
+
     currentSection = "Main"
     updateSection()
 end)
 
 logsButton.MouseButton1Click:Connect(function()
-    if destroyed then return end
+    if destroyed then
+        return
+    end
+
     currentSection = "Logs"
     updateSection()
 end)
 
 minimize.MouseButton1Click:Connect(function()
-    if destroyed then return end
+    if destroyed then
+        return
+    end
+
     setMinimized(not minimized)
 end)
 
@@ -1787,7 +1997,9 @@ clearButton.MouseButton1Click:Connect(function()
 end)
 
 helpButton.MouseButton1Click:Connect(function()
-    if destroyed then return end
+    if destroyed then
+        return
+    end
 
     if settingsOpen then
         settingsOpen = false
@@ -1803,14 +2015,19 @@ helpButton.MouseButton1Click:Connect(function()
 end)
 
 helpClose.MouseButton1Click:Connect(function()
-    if destroyed then return end
+    if destroyed then
+        return
+    end
+
     helpOpen = false
     helpShadow.Visible = false
     helpFrame.Visible = false
 end)
 
 settingsBtn.MouseButton1Click:Connect(function()
-    if destroyed then return end
+    if destroyed then
+        return
+    end
 
     if helpOpen then
         helpOpen = false
@@ -1827,24 +2044,35 @@ settingsBtn.MouseButton1Click:Connect(function()
 end)
 
 settingsClose.MouseButton1Click:Connect(function()
-    if destroyed then return end
+    if destroyed then
+        return
+    end
+
     settingsOpen = false
     settingsShadow.Visible = false
     settingsFrame.Visible = false
 end)
 
--------------------------------------------------
--- BRIDGE
--------------------------------------------------
 env.FleecingGUIBridge = {
     Ready = true,
     Session = myGuiSession,
 
     Receive = function(data)
-        if destroyed then return end
-        if not acceptingData then return end
-        if env.FleecingGUISession ~= myGuiSession then return end
-        if type(data) ~= "table" then return end
+        if destroyed then
+            return
+        end
+
+        if not acceptingData then
+            return
+        end
+
+        if env.FleecingGUISession ~= myGuiSession then
+            return
+        end
+
+        if type(data) ~= "table" then
+            return
+        end
 
         if data.type == "connection" then
             if data.connected then
@@ -1853,6 +2081,14 @@ env.FleecingGUIBridge = {
                 statusIndicator.BackgroundColor3 = Color3.fromRGB(116, 190, 142)
                 statusDescription.Text = "Receiving Discord data"
                 statusDescription.TextColor3 = Color3.fromRGB(122, 180, 140)
+
+                ignoreBulkSync = true
+
+                task.delay(2, function()
+                    if env.FleecingGUISession == myGuiSession and not destroyed then
+                        ignoreBulkSync = false
+                    end
+                end)
             else
                 status.Text = "Feed Disconnected"
                 status.TextColor3 = Color3.fromRGB(218, 224, 221)
@@ -1860,20 +2096,33 @@ env.FleecingGUIBridge = {
                 statusDescription.Text = "Waiting for C# bridge"
                 statusDescription.TextColor3 = Color3.fromRGB(145, 155, 150)
             end
+
             return
         end
 
         if data.type == "user_online" then
-            if type(data.username) ~= "string" or data.username == "" then return end
+            if ignoreBulkSync then
+                return
+            end
 
-            local alreadyHad = mainContent:FindFirstChild("User_" .. data.username) ~= nil
+            if type(data.username) ~= "string" or data.username == "" then
+                return
+            end
+
+            local alreadyHad =
+                mainContent:FindFirstChild("User_" .. data.username) ~= nil
 
             mainEmpty.Visible = false
+
             local entry = createUserEntry(data.username)
             updateUserPositions()
 
-            if fleecingEnabled and entry and not isMarked(data.username) then
+            if fleecingEnabled
+                and entry
+                and not isMarked(data.username) then
+
                 local tradeButton = entry:FindFirstChild("TradeButton")
+
                 if tradeButton and tradeButton.Visible then
                     performTrade(data.username, tradeButton)
                 end
@@ -1883,18 +2132,28 @@ env.FleecingGUIBridge = {
                 createLog("Online: " .. data.username)
                 updateLogPositions()
             end
+
             return
         end
 
         if data.type == "user_offline" then
-            if type(data.username) ~= "string" or data.username == "" then return end
+            if ignoreBulkSync then
+                return
+            end
 
-            local entry = mainContent:FindFirstChild("User_" .. data.username)
+            if type(data.username) ~= "string" or data.username == "" then
+                return
+            end
+
+            local entry =
+                mainContent:FindFirstChild("User_" .. data.username)
+
             if entry then
                 entry:Destroy()
             end
 
             local hasUsers = false
+
             for _, child in ipairs(mainContent:GetChildren()) do
                 if child:IsA("Frame") and child.Name:sub(1, 5) == "User_" then
                     hasUsers = true
@@ -1904,27 +2163,64 @@ env.FleecingGUIBridge = {
 
             mainEmpty.Visible = not hasUsers
             updateUserPositions()
+
             createLog("Offline: " .. data.username)
             updateLogPositions()
+
             return
         end
 
         if data.type == "brainrot" then
-            setBrainrot(data.username, data.brainrot, data.imageUrl, data.ogType)
-            createLog("Brainrot: " .. tostring(data.username) .. " -> " .. tostring(data.brainrot) .. " [" .. tostring(data.ogType) .. "]")
+            if ignoreBulkSync then
+                return
+            end
+
+            setBrainrot(
+                data.username,
+                data.brainrot,
+                data.imageUrl,
+                data.ogType
+            )
+
+            createLog(
+                "Brainrot: "
+                    .. tostring(data.username)
+                    .. " -> "
+                    .. tostring(data.brainrot)
+                    .. " ["
+                    .. tostring(data.ogType)
+                    .. "]"
+            )
+
             updateLogPositions()
+
             return
         end
 
         if data.type == "brainrot_removed" then
+            if ignoreBulkSync then
+                return
+            end
+
             removeBrainrot(data.username)
-            createLog("Brainrot removed: " .. tostring(data.username) .. " -> " .. tostring(data.brainrot))
+
+            createLog(
+                "Brainrot removed: "
+                    .. tostring(data.username)
+                    .. " -> "
+                    .. tostring(data.brainrot)
+            )
+
             updateLogPositions()
+
             return
         end
 
         if data.type == "log" then
-            if type(data.message) ~= "string" then return end
+            if type(data.message) ~= "string" then
+                return
+            end
+
             createLog(data.message)
             updateLogPositions()
         end
@@ -1940,30 +2236,30 @@ updateLoopTrades()
 updateSection()
 updateSettingsButtonVisibility()
 
--- Make sure any previous logic is fully dead before connecting again
 env.FleecingLogicStopRequested = true
+
 if type(env.FleecingLogicStop) == "function" then
     pcall(env.FleecingLogicStop)
 end
-task.wait(0.4)
-env.FleecingLogicStopRequested = false
 
--- Now accept data for this session only
+task.wait(0.5)
+
+env.FleecingLogicStopRequested = false
+env.FleecingLogicRunning = false
+
 acceptingData = true
 
-if not env.FleecingLogicRunning then
-    task.spawn(function()
-        local success, result = pcall(function()
-            return loadstring(
-                game:HttpGet(
-                    "https://raw.githubusercontent.com/samisagithub/rscripts-upd/main/Automated%20fleecing%20logic.luau"
-                )
-            )()
-        end)
-
-        if not success then
-            env.FleecingLogicRunning = false
-            warn("Failed to load Automated fleecing logic:", result)
-        end
+task.spawn(function()
+    local success, result = pcall(function()
+        return loadstring(
+            game:HttpGet(
+                "https://raw.githubusercontent.com/samisagithub/rscripts-upd/main/Automated%20fleecing%20logic.luau"
+            )
+        )()
     end)
-end
+
+    if not success then
+        env.FleecingLogicRunning = false
+        warn("Failed to load Automated fleecing logic:", result)
+    end
+end)
