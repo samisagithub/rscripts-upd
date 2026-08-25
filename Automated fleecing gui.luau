@@ -7,7 +7,11 @@ local playerGui = player:WaitForChild("PlayerGui")
 local env = getgenv()
 
 local oldGui = playerGui:FindFirstChild("FleecingGUI")
-local previousLogicRunning = env.FleecingLogicRunning == true
+
+-- Full cleanup when re-running (same as CLEAR)
+if type(env.FleecingClearData) == "function" then
+    pcall(env.FleecingClearData)
+end
 
 env.FleecingStopRequested = true
 env.FleecingLogicStopRequested = true
@@ -16,18 +20,9 @@ if type(env.FleecingLogicStop) == "function" then
     pcall(env.FleecingLogicStop)
 end
 
-local logicWaitStart = os.clock()
-while previousLogicRunning and env.FleecingLogicRunning == true and os.clock() - logicWaitStart < 3 do
-    task.wait(0.05)
-end
-
-if type(env.FleecingClearData) == "function" then
-    pcall(env.FleecingClearData)
-end
-
 env.FleecingGUIBridge = nil
 env.FleecingClearData = nil
-env.FleecingCurrentUsers = {}
+env.FleecingLoopTrades = false
 
 if oldGui then
     oldGui:Destroy()
@@ -40,7 +35,7 @@ env.FleecingLogicStopRequested = false
 -- CONFIG / JSON PERSISTENCE
 -------------------------------------------------
 local CONFIG_FILE = "FleecingConfig.json"
-local markedUsers = {}          -- { [username] = true }
+local markedUsers = {}
 local fleecingEnabled = false
 local loopTradesEnabled = false
 local minimized = false
@@ -54,8 +49,6 @@ local helpOpen = false
 local settingsOpen = false
 local isTrading = false
 local loopRunning = false
-local suppressInitialLogs = true
-local startupGeneration = tostring(os.clock()) .. "_" .. tostring(math.random(100000, 999999))
 
 local function saveConfig()
     local data = {
@@ -202,7 +195,6 @@ subtitle.TextXAlignment = Enum.TextXAlignment.Left
 subtitle.ZIndex = 5
 subtitle.Parent = frame
 
--- SETTINGS BUTTON (top bar)
 local settingsBtn = Instance.new("TextButton")
 settingsBtn.Name = "Settings"
 settingsBtn.Size = UDim2.new(0, 34, 0, 34)
@@ -671,24 +663,18 @@ helpContentCorner.Parent = helpContent
 
 local helpText = Instance.new("TextLabel")
 helpText.Name = "HelpText"
-helpText.Size = UDim2.new(1, -20, 0, 0)
+helpText.Size = UDim2.new(1, -20, 0, 210)
 helpText.Position = UDim2.new(0, 10, 0, 10)
 helpText.BackgroundTransparency = 1
-helpText.Text = "Welcome to the Fleecing Tool created by Sam.\n\nSTART FLEECING\nEnables or disables the main system.\n\nLOOP TRADES\nWhen both Fleecing + Loop Trades are on: trades newest user first, then continuously cycles oldest → newest. Note you may not be able to move properly with this enabled\n\nMARK FLEECE BUTTON\nMarks a user so they are skipped by auto-trade and loop. Marked users are grayed out and TRADE is hidden. Saved permanently until unmarked.\n\nSETTINGS (⚙)\nAppears when you have marked users. Lets you unmark them.\n\nCLEAR DATA\nRemoves currently displayed users (does not unmark them).\n\nMAIN / LOGS\nSwitch between tracked users and event logs for debugging."
+helpText.Text = "Welcome to the Fleecing Tool.\n\nSTART FLEECING\nEnables or disables the main system.\n\nLOOP TRADES\nWhen both Fleecing + Loop Trades are on: trades newest user first, then continuously cycles oldest → newest. State is saved.\n\nMARK FLEECE BUTTON\nMarks a user so they are skipped by auto-trade and loop. Marked users are grayed out and TRADE is hidden. Saved permanently until unmarked.\n\nSETTINGS (⚙)\nAppears when you have marked users. Lets you unmark them.\n\nCLEAR DATA\nRemoves currently displayed users (does not unmark them).\n\nMAIN / LOGS\nSwitch between tracked users and event logs."
 helpText.TextColor3 = Color3.fromRGB(205, 216, 209)
 helpText.TextSize = 11
 helpText.Font = Enum.Font.Gotham
 helpText.TextXAlignment = Enum.TextXAlignment.Left
 helpText.TextYAlignment = Enum.TextYAlignment.Top
 helpText.TextWrapped = true
-helpText.AutomaticSize = Enum.AutomaticSize.Y
 helpText.ZIndex = 54
 helpText.Parent = helpContent
-
-task.defer(function()
-    if destroyed or not helpText.Parent or not helpContent.Parent then return end
-    helpContent.CanvasSize = UDim2.new(0, 0, 0, helpText.AbsoluteSize.Y + 20)
-end)
 
 helpContent.CanvasSize = UDim2.new(0, 0, 0, 230)
 
@@ -908,7 +894,7 @@ local function updateUserPositions()
         return a.LayoutOrder < b.LayoutOrder
     end)
 
-   local entryHeight = 67
+    local entryHeight = 60
     local topPadding = 5
 
     for index, entry in ipairs(entries) do
@@ -996,10 +982,11 @@ local function clearCurrentData()
     mainEmpty.Visible = true
     logsEmpty.Visible = true
     mainContent.CanvasPosition = Vector2.new(0, 0)
-    logsContent.CanvasPosition = Vector2.new(0, 0)
     mainContent.CanvasSize = UDim2.new(0, 0, 0, mainContent.AbsoluteSize.Y)
+    logsContent.CanvasPosition = Vector2.new(0, 0)
     logsContent.CanvasSize = UDim2.new(0, 0, 0, logsContent.AbsoluteSize.Y)
 
+    createLog("Current user data cleared")
     updateLogPositions()
     updateUserPositions()
 end
@@ -1171,7 +1158,6 @@ local function updateSettingsButtonVisibility()
 end
 
 local function refreshSettingsList()
-    -- clear old rows
     for _, child in ipairs(settingsContent:GetChildren()) do
         if child:IsA("Frame") and child.Name:sub(1, 7) == "Marked_" then
             child:Destroy()
@@ -1242,7 +1228,6 @@ local function refreshSettingsList()
             saveConfig()
             updateSettingsButtonVisibility()
 
-            -- restore live entry if present
             local liveEntry = mainContent:FindFirstChild("User_" .. username)
             if liveEntry then
                 applyMarkedStyle(liveEntry, false)
@@ -1300,7 +1285,7 @@ local function createUserEntry(username)
 
     local entry = Instance.new("Frame")
     entry.Name = "User_" .. username
-  entry.Size = UDim2.new(1, -18, 0, 61)
+    entry.Size = UDim2.new(1, -18, 0, 54)
     entry.Position = UDim2.new(0, 8, 0, 0)
     entry.BackgroundColor3 = Color3.fromRGB(43, 50, 46)
     entry.BorderSizePixel = 0
@@ -1341,27 +1326,10 @@ local function createUserEntry(username)
     usernameLabel.ZIndex = 8
     usernameLabel.Parent = entry
 
-
-    local ingameStatus = Instance.new("TextLabel")
-ingameStatus.Name = "IngameStatus"
-ingameStatus.Size = UDim2.new(1, -260, 0, 14)
-ingameStatus.Position = UDim2.new(0, 51, 0, 22)
-ingameStatus.BackgroundTransparency = 1
-ingameStatus.Text = "User may not be ingame"
-ingameStatus.TextColor3 = Color3.fromRGB(145, 155, 150)
-ingameStatus.TextSize = 8
-ingameStatus.Font = Enum.Font.Gotham
-ingameStatus.TextXAlignment = Enum.TextXAlignment.Left
-ingameStatus.TextYAlignment = Enum.TextYAlignment.Center
-ingameStatus.TextTruncate = Enum.TextTruncate.AtEnd
-ingameStatus.ZIndex = 8
-ingameStatus.Parent = entry
-
-
     local brainrotImage = Instance.new("ImageLabel")
     brainrotImage.Name = "BrainrotImage"
     brainrotImage.Size = UDim2.new(0, 30, 0, 30)
-    brainrotImage.Position = UDim2.new(0, 51, 0, 31)
+    brainrotImage.Position = UDim2.new(0, 51, 0, 24)
     brainrotImage.BackgroundColor3 = Color3.fromRGB(48, 55, 51)
     brainrotImage.BorderSizePixel = 0
     brainrotImage.Image = ""
@@ -1372,10 +1340,11 @@ ingameStatus.Parent = entry
     brainrotCorner.CornerRadius = UDim.new(0, 6)
     brainrotCorner.Parent = brainrotImage
 
+    -- Brainrot text: middle of the lower row, clear of the image
     local brainrotLabel = Instance.new("TextLabel")
     brainrotLabel.Name = "Brainrot"
-    brainrotLabel.Size = UDim2.new(1, -260, 0, 30)
- brainrotLabel.Position = UDim2.new(0, 88, 0, 31)
+    brainrotLabel.Size = UDim2.new(1, -200, 0, 30)
+    brainrotLabel.Position = UDim2.new(0, 88, 0, 24)
     brainrotLabel.BackgroundTransparency = 1
     brainrotLabel.Text = "No brainrot detected"
     brainrotLabel.TextColor3 = Color3.fromRGB(170, 181, 175)
@@ -1387,7 +1356,6 @@ ingameStatus.Parent = entry
     brainrotLabel.ZIndex = 8
     brainrotLabel.Parent = entry
 
-    -- TRADE button
     local tradeButton = Instance.new("TextButton")
     tradeButton.Name = "TradeButton"
     tradeButton.Size = UDim2.new(0, 52, 0, 24)
@@ -1408,7 +1376,6 @@ ingameStatus.Parent = entry
     tradeCorner.CornerRadius = UDim.new(0, 6)
     tradeCorner.Parent = tradeButton
 
-    -- Mark fleece button (wider to fit text)
     local mfButton = Instance.new("TextButton")
     mfButton.Name = "MFButton"
     mfButton.Size = UDim2.new(0, 85, 0, 24)
@@ -1450,12 +1417,10 @@ ingameStatus.Parent = entry
         if destroyed then return end
 
         if isMarked(username) then
-            -- unmark
             markedUsers[username] = nil
             applyMarkedStyle(entry, false)
             createLog("Unmarked: " .. username)
         else
-            -- mark
             markedUsers[username] = true
             applyMarkedStyle(entry, true)
             createLog("Marked (Mark fleece): " .. username)
@@ -1466,7 +1431,6 @@ ingameStatus.Parent = entry
         updateLogPositions()
     end)
 
-    -- apply saved mark state
     if isMarked(username) then
         applyMarkedStyle(entry, true)
     end
@@ -1609,6 +1573,20 @@ local function destroyGUI()
     loopTradesEnabled = false
     fleecingEnabled = false
 
+    -- Same as CLEAR: wipe users + logs before destroying
+    pcall(function()
+        for _, child in ipairs(mainContent:GetChildren()) do
+            if child:IsA("Frame") and child.Name:sub(1, 5) == "User_" then
+                child:Destroy()
+            end
+        end
+        for _, child in ipairs(logsContent:GetChildren()) do
+            if child:IsA("TextLabel") and child ~= logsEmpty then
+                child:Destroy()
+            end
+        end
+    end)
+
     env.FleecingStopRequested = true
     env.FleecingLogicStopRequested = true
     env.FleecingLoopTrades = false
@@ -1625,7 +1603,6 @@ local function destroyGUI()
     end
 end
 
--- Continuous loop: oldest → newest (skips marked users)
 local function startLoopTrades()
     if loopRunning then return end
     loopRunning = true
@@ -1780,11 +1757,9 @@ clearButton.MouseButton1Click:Connect(function()
     clearCurrentData()
 end)
 
--- Help / Settings mutual exclusion
 helpButton.MouseButton1Click:Connect(function()
     if destroyed then return end
 
-    -- Close Settings if open
     if settingsOpen then
         settingsOpen = false
         settingsShadow.Visible = false
@@ -1808,7 +1783,6 @@ end)
 settingsBtn.MouseButton1Click:Connect(function()
     if destroyed then return end
 
-    -- Close Help if open
     if helpOpen then
         helpOpen = false
         helpShadow.Visible = false
@@ -1835,7 +1809,6 @@ end)
 -------------------------------------------------
 env.FleecingGUIBridge = {
     Ready = true,
-    Generation = startupGeneration,
 
     Receive = function(data)
         if destroyed then return end
@@ -1865,7 +1838,6 @@ env.FleecingGUIBridge = {
             local entry = createUserEntry(data.username)
             updateUserPositions()
 
-            -- Auto-trade newest user only if not marked
             if fleecingEnabled and entry and not isMarked(data.username) then
                 local tradeButton = entry:FindFirstChild("TradeButton")
                 if tradeButton and tradeButton.Visible then
@@ -1873,10 +1845,8 @@ env.FleecingGUIBridge = {
                 end
             end
 
-            if not suppressInitialLogs then
-                createLog("Online: " .. data.username)
-                updateLogPositions()
-            end
+            createLog("Online: " .. data.username)
+            updateLogPositions()
             return
         end
 
@@ -1928,18 +1898,11 @@ env.FleecingGUIBridge = {
 env.FleecingClearData = clearCurrentData
 env.FleecingLoopTrades = loopTradesEnabled
 env.FleecingLogicStopRequested = false
-env.FleecingCurrentUsers = {}
 
 updateToggle()
 updateLoopTrades()
 updateSection()
 updateSettingsButtonVisibility()
-
-task.delay(1, function()
-    if not destroyed then
-        suppressInitialLogs = false
-    end
-end)
 
 if not env.FleecingLogicRunning then
     task.spawn(function()
