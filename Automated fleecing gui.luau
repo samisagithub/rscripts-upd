@@ -899,8 +899,8 @@ local function updateUserPositions()
         return a.LayoutOrder < b.LayoutOrder
     end)
 
-    local entryHeight = 60
-    local topPadding = 5
+     local entryHeight = 78
+    local topPadding = 6
 
     for index, entry in ipairs(entries) do
         entry.Position = UDim2.new(0, 8, 0, topPadding + ((index - 1) * entryHeight))
@@ -1288,9 +1288,9 @@ local function createUserEntry(username)
     local existing = mainContent:FindFirstChild("User_" .. username)
     if existing then return existing end
 
-    local entry = Instance.new("Frame")
+       local entry = Instance.new("Frame")
     entry.Name = "User_" .. username
-    entry.Size = UDim2.new(1, -18, 0, 54)
+    entry.Size = UDim2.new(1, -18, 0, 72)
     entry.Position = UDim2.new(0, 8, 0, 0)
     entry.BackgroundColor3 = Color3.fromRGB(43, 50, 46)
     entry.BorderSizePixel = 0
@@ -1302,10 +1302,11 @@ local function createUserEntry(username)
     entryCorner.CornerRadius = UDim.new(0, 7)
     entryCorner.Parent = entry
 
+    -- Profile
     local profileImage = Instance.new("ImageLabel")
     profileImage.Name = "ProfilePicture"
-    profileImage.Size = UDim2.new(0, 36, 0, 36)
-    profileImage.Position = UDim2.new(0, 7, 0, 9)
+    profileImage.Size = UDim2.new(0, 42, 0, 42)
+    profileImage.Position = UDim2.new(0, 8, 0, 15)
     profileImage.BackgroundColor3 = Color3.fromRGB(48, 55, 51)
     profileImage.BorderSizePixel = 0
     profileImage.Image = ""
@@ -1316,14 +1317,15 @@ local function createUserEntry(username)
     imageCorner.CornerRadius = UDim.new(1, 0)
     imageCorner.Parent = profileImage
 
+    -- Username (top)
     local usernameLabel = Instance.new("TextLabel")
     usernameLabel.Name = "Username"
-    usernameLabel.Size = UDim2.new(1, -200, 0, 18)
-    usernameLabel.Position = UDim2.new(0, 51, 0, 5)
+    usernameLabel.Size = UDim2.new(1, -220, 0, 18)
+    usernameLabel.Position = UDim2.new(0, 58, 0, 6)
     usernameLabel.BackgroundTransparency = 1
     usernameLabel.Text = username
     usernameLabel.TextColor3 = Color3.fromRGB(214, 225, 218)
-    usernameLabel.TextSize = 10
+    usernameLabel.TextSize = 11
     usernameLabel.Font = Enum.Font.GothamMedium
     usernameLabel.TextXAlignment = Enum.TextXAlignment.Left
     usernameLabel.TextYAlignment = Enum.TextYAlignment.Center
@@ -1331,25 +1333,11 @@ local function createUserEntry(username)
     usernameLabel.ZIndex = 8
     usernameLabel.Parent = entry
 
-
-    local inGameHint = Instance.new("TextLabel")
-    inGameHint.Name = "InGameHint"
-    inGameHint.Size = UDim2.new(0, 120, 0, 18)
-    inGameHint.Position = UDim2.new(0, 195, 0.5, -9)
-    inGameHint.BackgroundTransparency = 1
-    inGameHint.Text = "User may not be ingame"
-    inGameHint.TextColor3 = Color3.fromRGB(155, 165, 160)
-    inGameHint.TextSize = 8
-    inGameHint.Font = Enum.Font.Gotham
-    inGameHint.TextXAlignment = Enum.TextXAlignment.Center
-    inGameHint.TextYAlignment = Enum.TextYAlignment.Center
-    inGameHint.ZIndex = 8
-    inGameHint.Parent = entry
-
+    -- Brainrot image
     local brainrotImage = Instance.new("ImageLabel")
     brainrotImage.Name = "BrainrotImage"
-    brainrotImage.Size = UDim2.new(0, 30, 0, 30)
-    brainrotImage.Position = UDim2.new(0, 51, 0, 24)
+    brainrotImage.Size = UDim2.new(0, 26, 0, 26)
+    brainrotImage.Position = UDim2.new(0, 58, 0, 26)
     brainrotImage.BackgroundColor3 = Color3.fromRGB(48, 55, 51)
     brainrotImage.BorderSizePixel = 0
     brainrotImage.Image = ""
@@ -1357,13 +1345,14 @@ local function createUserEntry(username)
     brainrotImage.Parent = entry
 
     local brainrotCorner = Instance.new("UICorner")
-    brainrotCorner.CornerRadius = UDim.new(0, 6)
+    brainrotCorner.CornerRadius = UDim.new(0, 5)
     brainrotCorner.Parent = brainrotImage
 
+    -- Brainrot text
     local brainrotLabel = Instance.new("TextLabel")
     brainrotLabel.Name = "Brainrot"
-    brainrotLabel.Size = UDim2.new(1, -200, 0, 30)
-    brainrotLabel.Position = UDim2.new(0, 88, 0, 24)
+    brainrotLabel.Size = UDim2.new(1, -220, 0, 26)
+    brainrotLabel.Position = UDim2.new(0, 90, 0, 26)
     brainrotLabel.BackgroundTransparency = 1
     brainrotLabel.Text = "No brainrot detected"
     brainrotLabel.TextColor3 = Color3.fromRGB(170, 181, 175)
@@ -1375,6 +1364,22 @@ local function createUserEntry(username)
     brainrotLabel.ZIndex = 8
     brainrotLabel.Parent = entry
 
+    -- Hint under brainrot row (fits cleanly)
+    local inGameHint = Instance.new("TextLabel")
+    inGameHint.Name = "InGameHint"
+    inGameHint.Size = UDim2.new(1, -220, 0, 14)
+    inGameHint.Position = UDim2.new(0, 58, 0, 54)
+    inGameHint.BackgroundTransparency = 1
+    inGameHint.Text = "User may not be ingame"
+    inGameHint.TextColor3 = Color3.fromRGB(145, 155, 150)
+    inGameHint.TextSize = 8
+    inGameHint.Font = Enum.Font.Gotham
+    inGameHint.TextXAlignment = Enum.TextXAlignment.Left
+    inGameHint.TextYAlignment = Enum.TextYAlignment.Center
+    inGameHint.ZIndex = 8
+    inGameHint.Parent = entry
+
+    -- TRADE button
     local tradeButton = Instance.new("TextButton")
     tradeButton.Name = "TradeButton"
     tradeButton.Size = UDim2.new(0, 52, 0, 24)
@@ -1395,6 +1400,7 @@ local function createUserEntry(username)
     tradeCorner.CornerRadius = UDim.new(0, 6)
     tradeCorner.Parent = tradeButton
 
+    -- Mark fleece button
     local mfButton = Instance.new("TextButton")
     mfButton.Name = "MFButton"
     mfButton.Size = UDim2.new(0, 85, 0, 24)
