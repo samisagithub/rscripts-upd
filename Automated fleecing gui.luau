@@ -7,10 +7,7 @@ local playerGui = player:WaitForChild("PlayerGui")
 local env = getgenv()
 
 local oldGui = playerGui:FindFirstChild("FleecingGUI")
-
-if type(env.FleecingClearData) == "function" then
-    pcall(env.FleecingClearData)
-end
+local previousLogicRunning = env.FleecingLogicRunning == true
 
 env.FleecingStopRequested = true
 env.FleecingLogicStopRequested = true
@@ -19,8 +16,18 @@ if type(env.FleecingLogicStop) == "function" then
     pcall(env.FleecingLogicStop)
 end
 
+local logicWaitStart = os.clock()
+while previousLogicRunning and env.FleecingLogicRunning == true and os.clock() - logicWaitStart < 3 do
+    task.wait(0.05)
+end
+
+if type(env.FleecingClearData) == "function" then
+    pcall(env.FleecingClearData)
+end
+
 env.FleecingGUIBridge = nil
 env.FleecingClearData = nil
+env.FleecingCurrentUsers = {}
 
 if oldGui then
     oldGui:Destroy()
@@ -47,6 +54,8 @@ local helpOpen = false
 local settingsOpen = false
 local isTrading = false
 local loopRunning = false
+local suppressInitialLogs = true
+local startupGeneration = tostring(os.clock()) .. "_" .. tostring(math.random(100000, 999999))
 
 local function saveConfig()
     local data = {
@@ -973,11 +982,24 @@ local function clearCurrentData()
         entry:Destroy()
     end
 
-    mainEmpty.Visible = true
-    mainContent.CanvasPosition = Vector2.new(0, 0)
-    mainContent.CanvasSize = UDim2.new(0, 0, 0, mainContent.AbsoluteSize.Y)
+    local logs = {}
+    for _, child in ipairs(logsContent:GetChildren()) do
+        if child:IsA("TextLabel") and child ~= logsEmpty then
+            table.insert(logs, child)
+        end
+    end
 
-    createLog("Current user data cleared")
+    for _, log in ipairs(logs) do
+        log:Destroy()
+    end
+
+    mainEmpty.Visible = true
+    logsEmpty.Visible = true
+    mainContent.CanvasPosition = Vector2.new(0, 0)
+    logsContent.CanvasPosition = Vector2.new(0, 0)
+    mainContent.CanvasSize = UDim2.new(0, 0, 0, mainContent.AbsoluteSize.Y)
+    logsContent.CanvasSize = UDim2.new(0, 0, 0, logsContent.AbsoluteSize.Y)
+
     updateLogPositions()
     updateUserPositions()
 end
@@ -1813,6 +1835,7 @@ end)
 -------------------------------------------------
 env.FleecingGUIBridge = {
     Ready = true,
+    Generation = startupGeneration,
 
     Receive = function(data)
         if destroyed then return end
@@ -1850,8 +1873,10 @@ env.FleecingGUIBridge = {
                 end
             end
 
-            createLog("Online: " .. data.username)
-            updateLogPositions()
+            if not suppressInitialLogs then
+                createLog("Online: " .. data.username)
+                updateLogPositions()
+            end
             return
         end
 
@@ -1909,6 +1934,12 @@ updateToggle()
 updateLoopTrades()
 updateSection()
 updateSettingsButtonVisibility()
+
+task.delay(1, function()
+    if not destroyed then
+        suppressInitialLogs = false
+    end
+end)
 
 if not env.FleecingLogicRunning then
     task.spawn(function()
